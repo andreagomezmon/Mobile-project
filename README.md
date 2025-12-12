@@ -77,3 +77,40 @@ The default PubSubClient library has a small packet size limit. Follow these ste
 - Upload the ESP32 sketches to your devices
 - Ensure Mosquitto broker is running
 - The log server will automatically connect and process incoming MQTT messages
+
+---
+
+## 4. Project Files
+
+### Root Level
+- **README.md** - This documentation file
+- **mosquitto.conf** - Configuration file for the Mosquitto MQTT broker
+- **logs.csv** - Log file containing recorded MQTT messages and events
+- **report.tex** - LaTeX document for project report generation
+
+### `esp32/` Directory
+Contains firmware for ESP32 devices:
+- **alarm_system/** - Arduino sketch for the alarm system device that publishes sensor data and receives control commands via MQTT
+
+### `Json/` Directory
+JSON schema files for message validation:
+- **envelope.schema.json** - Schema for the MQTT message envelope structure
+- **payload-config.schema.json** - Schema for configuration payload messages
+- **payload-emergency.schema.json** - Schema for emergency alert payloads
+- **payload-presence.schema.json** - Schema for presence detection payloads
+- **payload-sensor.schema.json** - Schema for sensor data payloads
+
+### `logs_server/` Directory
+Python-based logging and data processing server:
+- **log_server.py** - Main server script that listens to MQTT topics and logs messages
+- **plotter.py** - Utility script for visualizing logged data
+- **setup/** - Setup and configuration files for the logging server
+  - **requirements.txt** - Python dependencies
+  - **db/** - Database initialization scripts
+  - **scripts/** - Setup automation scripts
+  - **src/** - Database setup modules
+
+### `server_scripts/` Directory
+Additional server utilities and configuration:
+- **keys/** - Directory for storing encryption keys and certificates
+- **setup/** - Server configuration and initialization files
