@@ -1,0 +1,49 @@
+{
+  "$id": "https://example.com/schemas/envelope.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cookie Monitoring Encrypted Message Envelope",
+  "type": "object",
+  "required": [
+    "device_id",
+    "room_id",
+    "type",
+    "seq",
+    "iv",
+    "cipher",
+    "mac"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "pattern": "^D[0-9]{3}$"
+    },
+    "room_id": {
+      "type": "string",
+      "pattern": "^Room[0-9]+$"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["SENSOR", "EMERGENCY", "PRESENCE", "CONFIG"]
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "iv": {
+      "type": "string",
+      "description": "Base64-encoded 16-byte IV for AES-CTR",
+      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    },
+    "cipher": {
+      "type": "string",
+      "description": "Base64-encoded ciphertext",
+      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    },
+    "mac": {
+      "type": "string",
+      "description": "Base64-encoded HMAC-SHA256 tag",
+      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    }
+  }
+}

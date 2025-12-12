@@ -1,0 +1,20 @@
+{
+  "$id": "https://example.com/schemas/payload-sensor.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sensor Payload",
+  "type": "object",
+  "required": ["temp", "humidity"],
+  "additionalProperties": false,
+  "properties": {
+    "temp": {
+      "type": "number",
+      "minimum": -40,
+      "maximum": 125
+    },
+    "humidity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    }
+  }
+}

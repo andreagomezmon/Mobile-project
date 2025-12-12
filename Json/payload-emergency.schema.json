@@ -1,0 +1,14 @@
+{
+  "$id": "https://example.com/schemas/payload-emergency.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Emergency Payload",
+  "type": "object",
+  "required": ["status"],
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["EMERGENCY"]
+    }
+  }
+}

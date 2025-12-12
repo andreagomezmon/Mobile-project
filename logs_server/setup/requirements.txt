@@ -1,0 +1,6 @@
+# requirements.txt
+
+paho-mqtt
+pycryptodome
+jsonschema
+sqlite3

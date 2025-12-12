@@ -1,0 +1,21 @@
+CREATE TABLE room_keys (
+    room_id TEXT PRIMARY KEY,
+    enc_hex TEXT NOT NULL,
+    mac_hex TEXT NOT NULL
+);
+
+INSERT INTO room_keys (room_id, enc_hex, mac_hex) VALUES
+('Room1', '01010101010101010101010101010101', '0202020202020202020202020202020202020202020202020202020202020202'),
+('Room1', '01010101010101010101010101010101', '0202020202020202020202020202020202020202020202020202020202020202');
+
+CREATE TABLE expected_devices (
+    room_id TEXT,
+    device_id TEXT,
+    PRIMARY KEY (room_id, device_id)
+);
+
+INSERT INTO expected_devices (room_id, device_id) VALUES
+('Room1', 'D001'),
+('Room1', 'D002'),
+('Room2', 'D001'),
+('Room2', 'D002');

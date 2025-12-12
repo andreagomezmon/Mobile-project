@@ -1,0 +1,398 @@
+\documentclass[12pt,openright]{report}
+
+% ---------- Packages ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}          % clean Latin Modern font
+\usepackage[english]{babel}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}         % line spacing if needed
+\usepackage{microtype}        % better typography
+\usepackage{ragged2e}
+
+\usepackage{graphicx}         % for figures and logo
+\usepackage{subcaption}
+\usepackage{placeins}         % \FloatBarrier
+
+\usepackage{enumitem}         % compact lists
+\usepackage{amsmath,amssymb}  % math
+
+\usepackage{booktabs}         % nice tables
+\usepackage{tabularx}
+\usepackage{siunitx}
+\usepackage{float}
+\sisetup{
+  detect-weight=true, detect-family=true,
+  group-separator={,}, group-minimum-digits=4,
+  table-number-alignment=center
+}
+
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, skip=6pt}
+
+% ---------- ADD THIS LINE TO FIX TABLE OF CONTENTS ----------
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+
+% ---------- Meta ----------
+\title{\textbf{Arithmetic and Boolean Masking}\\[0.5em]
+\large INFO-F-537: Cryptanalysis}
+\author{%
+\textbf{Group Members}\\
+Gomez Montero Andrea\\
+Ravshan Ganiev\\
+Azizbek Ganiev\\
+ARABZAI Kamran Khan\\[2em]  % Changed from [1.0em] to [3em] for more space
+\textbf{Supervised by}\\
+Professor DRICOT Jean-Michel\\
+Ladner Navid}
+\date{Université Libre de Bruxelles \\ Academic Year 2025--2026}
+
+% =========================================================
+\begin{document}
+
+\setcounter{secnumdepth}{3}
+\renewcommand{\thesection}{\arabic{section}}
+
+\onehalfspacing
+\justifying
+
+% ---------- COVER PAGE ----------
+\begin{titlepage}
+  \centering
+  \vspace*{1cm}
+
+  % ---- Logo
+  \includegraphics[width=0.25\textwidth]{ULBLogo.png}\\[1.2cm]
+
+  {\Huge \textbf{Project Name}\par}
+  \vspace{0.5em}
+  {\Large ELECH423: Mobile and Wireless Networks\par}
+
+  \vspace{1.2cm}
+  {\large
+  \textbf{Group Members}\\
+  Gomez Montero Andrea\\
+  Ravshan Ganiev\\
+  Azizbek Ganiev\\
+  ARABZAI Kamran Khan\\[0.8em]
+
+  \textbf{Supervised by}\\
+  Professor DRICOT Jean-Michel\\
+Ladner Navid\\
+  \par}
+
+  \vfill
+  {\large Université Libre de Bruxelles\\
+  Academic Year 2025--2026\par}
+\end{titlepage}
+
+% ---------- Front Matter ----------
+\pagenumbering{roman}
+\setcounter{page}{1}
+% \chapter*{Abstract}
+% \addcontentsline{toc}{chapter}{Abstract}
+% (Add your abstract here.)
+
+% \chapter*{Acknowledgements}
+% \addcontentsline{toc}{chapter}{Acknowledgements}
+% (Optional.)
+
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\section{Introduction}
+
+In this project, a secure communication architecture is designed and implemented for a set of ESP32-based IoT devices deployed in a cookie production facility. The devices measure environmental conditions (temperature and humidity), provide an emergency button for workers, and signal alerts via LEDs, while exchanging data via an MQTT broker running on a laptop over Wi‑Fi. The overall goal is to build a realistic, factory-style cyber‑physical system and to harden its communication against network attackers.
+
+The central security objective is to ensure authentication, integrity, and confidentiality of all application messages exchanged through the untrusted MQTT broker and wireless network. Instead of relying on TLS or certificate-based mechanisms, the design uses a lightweight, application-layer security protocol tailored to the ESP32's constraints. Each device shares symmetric keys per room and protects messages using AES‑128 in CBC mode for encryption and HMAC‑SHA256 for message authentication, combined with sequence numbers and strict message validation to prevent spoofing, tampering, and replay.
+
+\section{System context and scenario}
+The project targets a large cookie production facility that operates multiple processing areas, including mixing, baking, cooling, packaging, and storage. In all these spaces, environmental conditions such as temperature and humidity must stay within predefined ranges to ensure product quality, avoid mold or moisture damage, and comply with sanitation and labor regulations. Machines in the facility are loud, so workers wear hearing protection and rely primarily on visual signals for safety‑critical alerts.
+
+To support monitoring and safety, each room is equipped with one or more ESP32-based Cookie Monitoring System devices. Every device has a DHT temperature and humidity sensor, a push button, a red LED, and a white LED. The ESP32 periodically measures temperature and humidity and publishes readings, while the button allows workers to trigger an emergency signal. The MQTT broker runs on a laptop within the factory network and acts as a hub for all device-to-device communication.
+
+Each device is configured with a unique device identifier, a room identifier, and threshold ranges for acceptable temperature and humidity. The LEDs provide immediate, room-wide feedback to workers according to the following logic: pressing the emergency button on any device in a room turns on the red LED on all devices in that room; the white LED turns on when all sensors in the room report values within the configured thresholds; the white LED blinks to indicate environmental problems (out-of-range readings) or device issues (such as unexpected disconnection or sensor failures). If a device loses connection to the MQTT broker, its white LED turns off to signal that it is not currently participating in the monitoring system.
+
+This cookie factory scenario provides a realistic industrial IoT context in which incorrect measurements, missed emergencies, or forged messages can have tangible operational and safety consequences. It motivates the need for secure communication over an untrusted network, as attackers who can access the Wi‑Fi or MQTT broker could otherwise inject fake emergencies, hide hazardous conditions, or disrupt coordination between devices.
+
+
+\section{System architecture and data flow}
+\subsection{Physical and logical setup} 
+The prototype consists of two ESP32-based Cookie Monitoring System devices deployed in the same room of the cookie factory. Each ESP32 is connected to a DHT temperature and humidity sensor, one red LED, one white LED, and a push button using the wiring provided in the lab schematics. The ESP32 boards connect via Wi‑Fi to a laptop that hosts the MQTT broker and an optional logging component.
+
+Logically, each device is configured with a unique device\_id, a room\_id, and local thresholds for acceptable temperature and humidity. Devices publish and subscribe to room-specific MQTT topics, so that all devices in the same room receive the same sensor readings and emergency events. A separate subscriber on the laptop records decrypted and verified messages to a log file or database for auditability and debugging.
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|X|X|X|}
+\hline
+\textbf{Component} & \textbf{Description} & \textbf{Trust level} \\
+\hline
+ESP32 device & Microcontroller running custom firmware, sensors, LEDs, and button & Trusted endpoint \\
+\hline
+Push button & Input for workers to trigger emergency events & Trusted peripheral \\
+\hline
+Wi-Fi network & Wireless communication medium between ESP32 devices and laptop & Untrusted \\
+\hline
+MQTT broker (laptop) & Message routing component for publish/subscribe communication & Untrusted \\
+\hline
+Logging subscriber & Application on laptop that verifies, decrypts, and stores messages & Trusted endpoint \\
+\hline
+Configuration tools & Scripts or utilities used to provision device IDs, keys, and thresholds & Trusted admin tool \\
+
+\bottomrule
+\end{tabularx}
+\caption{System components and trust levels}
+\end{table}
+
+
+\subsection{Data flow and trust boundaries}
+
+All communication between ESP32 devices is mediated by the MQTT broker, which is explicitly treated as untrusted transport. Sensor readings and emergency button events are first processed by the ESP32 firmware, then encapsulated in the custom secure message format, and finally published to the appropriate MQTT topic using Wi‑Fi. Other devices in the same room subscribe to these topics, verify and decrypt the messages, and update their LEDs accordingly, while the logging subscriber on the laptop stores a verified copy of the data.
+
+The main trust boundaries are: between each ESP32 and the surrounding network (Wi‑Fi plus MQTT broker), and between the broker and the logging component. ESP32 devices and the logging subscriber are within the trusted zone that shares symmetric keys and enforces security checks, while the MQTT broker and network infrastructure are considered potentially controlled by an attacker. Within this model, even a fully compromised broker or a passive network sniffer should not be able to forge valid messages, read sensor data, or suppress safety‑critical alerts without detection.
+
+ \begin{figure}[H] % 'h' indicates 'here' as the preferred position for the image
+    \centering
+    \includegraphics[width=1\textwidth]{Images/Protocol.png} % Adjust width as needed
+    \caption{Data flow diagram}
+    \label{fig:example-image}
+\end{figure}
+
+
+\FloatBarrier
+\section{Threat model}
+\subsection{Assets and security goals} 
+The primary assets in this system are the correctness and availability of emergency alerts, the integrity of environmental measurements, and the accuracy of room status as indicated by the LEDs. These directly affect worker safety and production quality in the cookie factory. Secondary assets include the confidentiality of sensor readings and event logs, which reveal operational conditions and incident history of the facility.
+
+From these assets, the main security goals are:
+
+\begin{itemize}[leftmargin=1.2em]
+    \item \textbf{Authentication:} only legitimate ESP32 devices and the trusted logging component should be able to publish messages that influence LEDs or logs.
+    \item \textbf{Integrity and freshness:} messages must not be modified or replayed without detection, so that decisions are based on genuine, up-to-date information.
+    \item \textbf{Confidentiality:} adversaries with access to the Wi-Fi network or MQTT broker must not be able to read sensor values or emergency states.
+\end{itemize}
+
+Availability is addressed on a best-effort basis by limiting processing of malformed or excessive traffic, but complete protection against powerful denial‑of‑service attacks (for example, jamming Wi‑Fi) is not a goal of this design.
+
+
+\subsection{Attacker capabilities and STRIDE model}
+The main adversary considered is a network attacker who can connect to the same Wi‑Fi network as the ESP32 devices and the MQTT broker. This attacker can subscribe and publish to MQTT topics, sniff and modify traffic between devices and broker, and potentially run or compromise the broker process itself. Such an attacker can attempt to spoof devices, inject fake emergencies, alter or replay sensor readings, and flood the broker or devices with malformed messages.
+
+To structure these capabilities, the threats are categorized using STRIDE, identifying how a simple MQTT setup would be vulnerable and how the proposed design mitigates each case:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|X|X|X|X|}
+\hline
+\textbf{Threat} & \textbf{Vulnerability} & \textbf{Mitigation} & \textbf{Effect / Residual risk} \\
+\hline
+
+Spoofing &
+Any client that can reach the broker can publish to shared topics and impersonate a legitimate device. &
+All application messages include an HMAC-SHA256 tag computed with a shared key over header and ciphertext; devices verify MAC, device\_id, room\_id, type, and sequence number before acting. &
+Only nodes that know the shared MAC key can produce valid messages; unauthenticated MQTT publishers are ignored. \\
+\hline
+
+Tampering &
+An attacker on Wi-Fi or controlling the broker can modify MQTT payloads in transit. &
+Messages are encrypted with AES-128-CBC and authenticated with HMAC-SHA256; receivers verify MAC before decryption and discard messages with invalid MAC or outdated sequence numbers. &
+Modified messages fail MAC verification and are discarded; tampering cannot affect LEDs or logs. \\
+\hline
+Repudiation &
+Without integrity and order, abnormal events are hard to trace. &
+Each message carries device\_id and sequence number in the authenticated header; the logging subscriber verifies MACs and stores timestamp, device\_id, payload, and sequence number. &
+Provides auditability and basic accountability; full non-repudiation is not possible with shared symmetric keys. \\
+
+\bottomrule
+\end{tabularx}
+\caption{STRIDE threat analysis for the ESP32 secure messaging system (cont.d}
+\end{table}
+
+
+
+
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|X|X|X|X|}
+\hline
+\textbf{Threat} & \textbf{Vulnerability} & \textbf{Mitigation} & \textbf{Effect / Residual risk} \\
+\hline
+
+
+
+Information disclosure &
+MQTT topics and Wi-Fi traffic are plaintext by default, so anyone nearby can read sensor data and alerts. &
+Payloads are encrypted with AES-128-CBC using a shared key and a fresh random IV for every message. Only ciphertext and non-sensitive metadata reach the broker. &
+Network observers cannot read environmental measurements or emergency states without the key. \\
+\hline
+Denial of Service (DoS) &
+Malicious clients can flood the broker or send oversized/invalid messages, overwhelming ESP32 devices. &
+Strict validation order (size → sequence window → MAC → type); rate limiting and max message size enforcement in device firmware and broker configuration. &
+DoS is reduced but not eliminated; a strong attacker can still jam Wi-Fi or exhaust broker resources. \\
+\hline
+Elevation of privilege &
+In a flat topic namespace without checks, any device could change configuration or act as controller. &
+Devices accept only limited message types and verify MAC and correct room\_id; CONFIG updates are only applied from authenticated messages. &
+No higher-privilege roles exist; no further escalation is possible beyond having a shared key. \\
+
+\bottomrule
+\end{tabularx}
+\caption{STRIDE threat analysis for the ESP32 secure messaging system}
+\end{table}
+
+
+
+\subsection{Physical attacks and limitations}
+Physical attacks on devices are acknowledged as a relevant risk in real industrial deployments, especially regarding the extraction or misuse of cryptographic keys stored on the ESP32. In this prototype, keys are hardcoded for practical reasons (see Section 5.3.4 for the production architecture definition), and secure key storage features such as fused eFuses are discussed as the preferred option in a production system. The project assumes that the factory’s operational controls (locked enclosures, restricted access areas, supervised maintenance) provide baseline protection against simple physical tampering.
+
+However, the design does not implement dedicated hardware tamper‑resistance mechanisms or side‑channel protections, and it does not attempt to defend against a well‑resourced attacker who gains prolonged physical access to a device and uses specialized equipment to extract keys. These aspects are recognized as limitations of the prototype and are addressed at the level of deployment recommendations and key‑management discussion rather than through additional hardware measures.
+
+\subsection{Out-of-scope threats}
+Several threat classes are considered out of scope for this project to keep the focus on communication security and IoT protocol design:
+
+\begin{itemize}[leftmargin=1.2em]
+    \item \textbf{Strong physical compromise:} attacks that involve opening devices, probing internal buses, or using hardware attacks to extract keys from flash or secure storage are not directly mitigated beyond relying on factory physical controls and good key‑management practices.
+
+    \item \textbf{Malicious insiders with full admin rights:} system administrators or operators who already control the laptop OS, broker configuration, or build pipeline are assumed honest; protecting against them would require organizational and process controls beyond the scope of this lab.
+
+    \item \textbf{High‑bandwidth denial of service:} attacks that exhaust Wi‑Fi capacity, power-cycle devices, or crash the broker host are acknowledged but not fully prevented; the design instead focuses on ensuring devices fail gracefully and avoid unnecessary processing of malicious traffic.
+\end{itemize}
+
+Under this threat model, the security protocol is specifically designed so that even if an attacker controls the network and MQTT broker, and can observe or modify all traffic, they cannot successfully impersonate devices, undetectably alter messages, or read protected payloads without possessing the shared symmetric keys.
+
+
+\section{Security protocols and Mitigations}
+\subsection{Design rationale and security goal}
+The security protocol is implemented at the application layer, on top of MQTT, so that confidentiality, integrity, authentication, and replay protection hold even if the broker or Wi‑Fi network are fully controlled by an attacker. ESP32 devices in the same room share two symmetric keys: one for encryption and one for message authentication. This symmetric design avoids the complexity and overhead of public‑key infrastructures and certificates, in line with the constraint to not use TLS or certificate-based authentication and with the limited resources of the ESP32.
+
+\textbf{The protocol is designed to satisfy three main properties for all application messages:}
+
+\begin{itemize}
+    \item \textbf{Confidentiality:} protect sensor readings and emergency state from observers on the network or broker.
+
+    \item \textbf{Integrity and authentication:} detect any modification or injection of messages by parties that do not possess the shared keys.
+
+    \item \textbf{Replay protection and robustness:} prevent an attacker from replaying old valid messages and limit the impact of malformed or excessive traffic on constrained devices.
+\end{itemize}
+
+\subsection{Message format and protocol steps}
+Each ESP32 in a room shares the following symmetric keys with its peers: a 16-byte encryption key \texttt{K\_enc} for AES-128-CBC and a 32-byte MAC key \texttt{K\_mac} for HMAC-SHA256. Application messages (sensor, emergency, presence, configuration) are encoded in JSON and transported via MQTT topics, with the following high-level structure.
+
+\textbf{Header fields (plaintext but authenticated):}
+\begin{itemize}
+    \item \texttt{device\_id}
+    \item \texttt{room\_id}
+    \item \texttt{type} (e.g., \texttt{SENSOR}, \texttt{EMERGENCY}, \texttt{PRESENCE}, \texttt{CONFIG})
+    \item \texttt{seq} (monotonic sequence number)
+    \item \texttt{iv} (Base64-encoded 16-byte random IV)
+\end{itemize}
+
+\textbf{Body fields:}
+
+ \begin{figure}[H] % 'h' indicates 'here' as the preferred position for the image
+    \centering
+    \includegraphics[width=1\textwidth]{Images/MQQT Payload.png} % Adjust width as needed
+    \caption{MQQT Payload Structure}
+    \label{fig:example-image}
+\end{figure}
+
+
+
+\begin{itemize}
+    \item \texttt{cipher} (Base64-encoded AES-CBC ciphertext of the JSON payload)
+    \item \texttt{mac} (HMAC-SHA256 tag over header and ciphertext)
+\end{itemize}
+The final MQTT payload is a JSON object containing the Header fields, the Ciphertext, and the MAC.
+The sender executes these steps for each message:
+
+\begin{enumerate}
+    \item Construct a JSON payload containing the application data (e.g., temperature and humidity, emergency status).
+    \item Pad the payload using PKCS\#7 and encrypt it with AES-128-CBC using \texttt{K\_enc} and a fresh 16-byte IV from the ESP32 hardware RNG.
+    \item Build the header (\texttt{device\_id}, \texttt{room\_id}, \texttt{type}, \texttt{seq}, \texttt{iv}) and compute the HMAC-SHA256 tag over the header concatenated with the ciphertext using \texttt{K\_mac}.
+    \item Publish the resulting JSON message (header + cipher + mac) to the room-specific MQTT topic.
+\end{enumerate}
+
+On reception, each ESP32 device performs strict validation before acting on a message:
+
+\begin{enumerate}
+    \item Check message size and type, and discard any message exceeding configured limits or with an unexpected type.
+    \item Validate \texttt{room\_id} and \texttt{device\_id} fields according to local policy (e.g., only accept messages from the same room).
+    \item Check the sequence number against a replay window; reject too-old or duplicated messages.
+    \item Verify the HMAC-SHA256 tag using \texttt{K\_mac}. If it fails, discard the message without attempting decryption.
+    \item Decrypt the ciphertext with AES-128-CBC using \texttt{K\_enc} and the provided IV, remove padding, and parse the payload.
+    \item Update LEDs and local state (e.g., emergency status, environmental status, configuration) according to the verified message type.
+\end{enumerate}
+
+Emergency messages are treated as safety-critical and are sent with higher MQTT QoS than regular sensor data, while sensor readings use a lower QoS to reduce load. MQTT Last Will and Testament is used so that unexpected disconnections are detected by peers, which then signal a device problem by adjusting the white LED state.
+
+ \begin{figure}[H] % 'h' indicates 'here' as the preferred position for the image
+    \centering
+    \includegraphics[width=1\textwidth]{Images/Protocol.png} % Adjust width as needed
+    \caption{Protocol steps}
+    \label{fig:example-image}
+\end{figure}
+
+\subsection{Key Management and Device Integrity Architecture}
+While the packet-level security (Section 5.2) protects data in transit, the physical security of the device is paramount in an industrial setting. We have designed a hierarchical key management strategy rooted in hardware to protect cryptographic material from extraction.
+
+\subsubsection{Hardware Root of Trust (Flash Encryption)}
+The security anchor is the ESP32’s One-Time Programmable (OTP) eFuses. In a production deployment, a random 256-bit AES key is generated and programmed into BLOCK1 of the eFuse array. The "Read Disable" bit is burned, rendering the key inaccessible to software. The ESP32’s hardware cryptographic accelerator uses this hidden key to transparently decrypt all content read from the external flash memory via AES-256-XTS, preventing physical flash dumping attacks.
+
+\subsubsection{Application Key Storage (NVS)}
+The symmetric keys used for MQTT communication (\texttt{K\_enc}, \texttt{K\_mac}) are not hardcoded in the firmware binary. Instead, they are stored in the Encrypted NVS (Non-Volatile Storage) partition. This partition is encrypted using the hardware-bound Flash Encryption Key. This architecture decouples application keys from the firmware image, allowing keys to be rotated without reflashing the entire device.
+
+\subsubsection{Secure Boot V2}
+To ensure code integrity, we specify the use of Secure Boot V2. An RSA-3072 signing key is generated offline, and the SHA-256 digest of its public key is burned into eFuse BLOCK2. On every boot, the ROM bootloader verifies the digital signature of the firmware. This prevents an attacker from bypassing flash encryption by flashing malicious, unsigned code onto the device.
+
+\subsubsection{Prototype Adaptation}
+Constraint: As this project utilizes university laboratory equipment, we are strictly prohibited from performing irreversible hardware operations (burning eFuses). Therefore, the prototype simulates this architecture by defining \texttt{K\_enc} and \texttt{K\_mac} as constants in the source code. While this leaves the prototype vulnerable to physical extraction, the logical design reflects the intended production architecture.
+
+\subsection{Mapping protocol mechanisms to threats}
+The protocol mechanisms directly address the threats identified in the STRIDE analysis. HMAC‑SHA256 with \texttt{K\_mac}, combined with checks on \texttt{device\_id}, \texttt{room\_id}, and message type, prevents spoofing and ensures that only nodes with the shared key can inject accepted messages. AES‑128‑CBC with fresh IVs ensures that an attacker who can observe broker traffic or sniff Wi‑Fi cannot read application payloads, mitigating information disclosure.
+
+Sequence numbers and optional replay windows on receivers prevent simple replay attacks that could otherwise re‑trigger emergencies or hide changes in environmental conditions. Strict input validation (size limits, type checks, early MAC verification) and rate limiting reduce the impact of malformed or excessive traffic on ESP32 devices and help the system fail gracefully under denial‑of‑service attempts, even though high‑bandwidth DoS cannot be fully prevented. Finally, the logging subscriber verifies MACs and records \texttt{device\_id}, sequence number, and payload for each message, providing operational auditability and making it easier to reconstruct the sequence of events after an incident, even though strong cryptographic non‑repudiation is not achieved due to shared symmetric keys.
+
+\section{Assumptions and Limitations}
+This section summarizes the main assumptions made by the design and the practical limitations of the prototype in the lab setting, especially regarding key management, deployment scale, and protocol efficiency.
+
+\subsection{Deployment and configuration assumptions}
+The system assumes that all devices are configured before installation with the correct parameters: shared symmetric keys, \texttt{device\_id}, \texttt{room\_id}, and threshold values for temperature and humidity. In a real deployment, this initial provisioning is assumed to take place in a controlled environment, using trusted tools and operators, so that keys and identifiers are not exposed to attackers during setup.
+
+It is also assumed that the cookie factory provides basic physical protections: devices are mounted in non-public areas, access to equipment rooms is restricted, and maintenance is performed by trusted staff. Under these conditions, casual physical tampering (such as unplugging sensors or pressing buttons maliciously) is considered detectable and manageable by operational procedures rather than by the protocol itself.
+
+\subsection{Network and broker assumptions}
+The MQTT broker and Wi‑Fi network are explicitly treated as untrusted, and the protocol is designed so that confidentiality, integrity, and authentication do not rely on broker security. However, it is assumed that the factory can enforce basic network hygiene: limiting who can join the Wi‑Fi, configuring the broker to restrict maximum message size and number of connections, and monitoring for obvious abuse.
+
+The system does not attempt to fully prevent high‑bandwidth denial‑of‑service attacks, such as jamming Wi‑Fi, saturating the access point, or repeatedly rebooting the broker host. Instead, devices implement input validation, rate limiting, and small message formats so that they fail gracefully and avoid crashing under malformed or excessive traffic, while acknowledging that availability against a powerful network attacker remains a limitation.
+
+\subsection{Scalability and protocol efficiency}
+The design targets small to medium room sizes, with an assumed range of 1 to 10 devices per room, which influences choices such as shared room keys and broadcast-style MQTT topics. This simplifies key management and message distribution but would need adjustment for much larger deployments or multi-tenant scenarios where per-device keys and stricter topic isolation become necessary.
+
+For simplicity of development and debugging, the protocol uses JSON encoding and Base64 for binary fields (IV, ciphertext, MAC), which increases message size by roughly 30–40\% compared to a compact binary format. This overhead is acceptable in the lab context and at the assumed scale, but it is recognized as a limitation for bandwidth-constrained or very large deployments, where a binary serialization format would be preferable.
+
+\section{Future work}
+This prototype demonstrates that an application-layer security protocol with symmetric keys, AES‑128‑CBC encryption, and HMAC‑SHA256 can secure ESP32‑based communication over an untrusted MQTT broker in a cookie factory scenario. Building on this foundation, several improvements would be required for a production‑grade deployment. These mainly concern automated key management, more secure key storage, protocol efficiency, and larger‑scale operational practices.
+
+Finally, protocol and system extensions could address scalability and operational integration. On the protocol side, replacing JSON and Base64 with a compact binary format would reduce overhead and improve performance in dense deployments. On the system side, integrating alerts and logs with existing factory monitoring tools, adding anomaly detection over the collected data, and evaluating the design under more realistic network stress conditions would provide stronger evidence of robustness and practical usefulness.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\end{document}
+
+
+
+
